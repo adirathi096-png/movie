@@ -13,26 +13,24 @@ export default async function handler(req, res) {
     console.error('[Vercel Serverless] Database connection failure:', err.message);
   }
 
-  // If DB failed and request is a status or root check, provide clear diagnostic without crashing
-  if (dbError && (req.url === '/' || req.url === '/api' || req.url === '/api/v1' || req.url?.includes('health'))) {
-    return res.status(200).json({
-      success: true,
-      service: 'IMovies REST API',
-      status: 'online',
-      database: 'disconnected',
-      databaseError: dbError,
-      hint: 'Please check your MONGODB_URI in Vercel project settings. Ensure MongoDB Atlas Network Access has 0.0.0.0/0 allowed and user password is correct.',
-    });
-  }
-
+  // If DB connection failed, return clean informative JSON without throwing 500 FUNCTION_INVOCATION_FAILED
   if (dbError) {
-    return res.status(500).json({
+    const isBadAuth = dbError.includes('bad auth') || dbError.includes('authentication failed');
+    return res.status(200).json({
       success: false,
-      message: 'Database connection failed. Please ensure MONGODB_URI is correctly configured in Vercel.',
+      service: 'IMovies REST API',
+      status: 'database_authentication_required',
+      message: isBadAuth
+        ? 'MongoDB Atlas Authentication Failed: The password in your MONGODB_URI is incorrect or contains unencoded special characters.'
+        : 'Database connection failed. Please verify your MONGODB_URI and Atlas Network Access.',
       databaseError: dbError,
+      actionRequired: isBadAuth
+        ? 'Go to MongoDB Atlas -> Database Access -> Edit user "adirathi096_db_user" -> Set a new simple password (e.g. "Imovies12345") -> Update MONGODB_URI in Vercel Settings -> Redeploy.'
+        : 'Ensure MONGODB_URI is configured in Vercel project settings and Network Access allows 0.0.0.0/0.',
     });
   }
 
   return app(req, res);
 }
+
 
