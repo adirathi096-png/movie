@@ -1,9 +1,27 @@
 import { Movie } from '../models/Movie.js';
+import { seedInitialData } from '../utils/seedData.js';
+
+let isSeeding = false;
 
 export const getMovies = async (req, res, next) => {
   try {
+    // Automatically seed movies if database is empty on first deployment
+    const totalMoviesInDb = await Movie.countDocuments();
+    if (totalMoviesInDb === 0 && !isSeeding) {
+      isSeeding = true;
+      try {
+        console.log('[AutoSeed] Database empty. Seeding initial demonstration data...');
+        await seedInitialData();
+      } catch (seedErr) {
+        console.error('[AutoSeed] Failed to auto-seed database:', seedErr);
+      } finally {
+        isSeeding = false;
+      }
+    }
+
     const {
       search,
+
       genre,
       status,
       language,

@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import { seedInitialData } from '../utils/seedData.js';
 
 const router = express.Router();
 
@@ -19,4 +20,21 @@ router.get('/', (req, res) => {
   });
 });
 
+router.all('/seed', async (req, res) => {
+  try {
+    const result = await seedInitialData();
+    res.json({
+      success: true,
+      message: 'Database seeded successfully with movies, cinemas, and showtimes!',
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Seeding failed: ' + err.message,
+    });
+  }
+});
+
 export default router;
+
