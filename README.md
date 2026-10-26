@@ -173,29 +173,149 @@ npm run test:client
 
 ---
 
-## 🚀 Deployment Guide
+## 🚀 Production Deployment on Vercel
 
-### Frontend (Vercel / Netlify)
-1. Set the root directory to `client`.
-2. Build command: `npm run build`.
-3. Output directory: `dist`.
-4. Configure environment variable: `VITE_API_BASE_URL=https://your-backend.onrender.com/api/v1`.
+IMovies is designed with a full-stack monorepo architecture. Vercel detects both the frontend (`client/`) and backend (`server/`). 
 
-### Backend (Render / Railway / AWS EC2)
-1. Set root directory to `server`.
-2. Build command: `npm install`.
-3. Start command: `npm start`.
-4. Configure environment variables:
-   ```env
-   NODE_ENV=production
-   PORT=5000
-   CLIENT_URL=https://your-frontend.vercel.app
-   MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/imovies?retryWrites=true&w=majority
-   JWT_SECRET=your_super_strong_production_secret_key_123456
-   HOLD_EXPIRY_MINUTES=8
+### Recommended Architecture: Two Vercel Projects
+For maximum stability, isolation, and standard Vite/Express serverless support, deploy as **two projects in the same Vercel team/account connected to the same GitHub repository**:
+1. **Backend Project**: `imovies-api` (Root Directory: `server`)
+2. **Frontend Project**: `imovies-web` (Root Directory: `client`)
+
+*(Note: A single-project fallback configuration is also supported via root `vercel.json` and `api/index.js` if you prefer unified routing).*
+
+---
+
+### Step 1: Push Code to GitHub
+Ensure all code and configuration files are committed and pushed to your GitHub repository:
+```bash
+git add .
+git commit -m "feat(deploy): full-stack vercel deployment configuration"
+git push origin main
+```
+Repository: `https://github.com/adirathi096-png/movie`
+
+---
+
+### Step 2: Configure MongoDB Atlas (Production Database)
+1. Log in to [MongoDB Atlas](https://cloud.mongodb.com/).
+2. **Create a Database User**:
+   - Go to **Security** → **Database Access** → **Add New Database User**.
+   - Authentication Method: **Password**.
+   - Database User Privileges: **Read and write to any database**.
+   - Note the username and password (avoid special characters like `@` or `:` in the password, or URL-encode them).
+3. **Configure Network Access**:
+   - Go to **Security** → **Network Access** → **Add IP Address**.
+   - Select **Allow Access from Anywhere** (`0.0.0.0/0`).
+   > [!NOTE]
+   > Vercel Serverless Functions execute on dynamic IP pools across AWS regions and do not have fixed outbound IP addresses. Therefore, `0.0.0.0/0` is required unless you use MongoDB Atlas VPC Peering or an AWS PrivateLink gateway. Atlas protects access via strong SCRAM password authentication and TLS/SSL encryption.
+4. **Obtain Connection String**:
+   - Go to **Database** → **Connect** → **Drivers** (Node.js).
+   - Copy the URI:
+     ```
+     mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/imovies?retryWrites=true&w=majority
+     ```
+
+---
+
+### Step 3: Deploy the Backend API (`imovies-api`)
+1. In your [Vercel Dashboard](https://vercel.com/dashboard), click **"Add New..."** → **"Project"**.
+2. Select your repository `adirathi096-png/movie` and click **Import**.
+3. **Configure Project Settings**:
+   - **Project Name**: `imovies-api` (or your preferred name)
+   - **Framework Preset**: Select **Other**
+   - **Root Directory**: Click *Edit* and select **`server`**
+4. **Build and Output Settings**:
+   - Build Command: Leave blank / default
+   - Output Directory: Leave blank / default
+   - Install Command: `npm install`
+5. **Environment Variables**:
+   Add the following variables under the **Production**, **Preview**, and **Development** tabs:
+
+   | Variable Name | Example / Recommended Value | Description |
+   |---|---|---|
+   | `NODE_ENV` | `production` | Enables production optimizations and disables in-memory DB |
+   | `MONGODB_URI` | `mongodb+srv://user:pass@cluster.mongodb.net/imovies?retryWrites=true&w=majority` | Your MongoDB Atlas connection URI |
+   | `JWT_SECRET` | `c3a8e9f2d1b0...` *(generate 64 random characters)* | Token signing secret |
+   | `JWT_EXPIRES_IN` | `7d` | Token validity period |
+   | `HOLD_EXPIRY_MINUTES` | `8` | Temporary seat hold reservation lifetime |
+   | `CLIENT_URL` | `https://your-frontend-project.vercel.app` *(update after Step 4)* | Allowed CORS origin for the frontend |
+
+6. Click **Deploy**.
+7. Once deployed, note your backend URL (e.g. `https://imovies-api-adirathi.vercel.app`).
+8. Verify readiness by opening `https://<backend-url>/api/v1/health` in your browser. You should receive:
+   ```json
+   { "success": true, "message": "IMovies API is healthy", "database": "connected" }
    ```
+
+---
+
+### Step 4: Deploy the Frontend (`imovies-web`)
+1. In your [Vercel Dashboard](https://vercel.com/dashboard), click **"Add New..."** → **"Project"**.
+2. Import the same repository `adirathi096-png/movie`.
+3. **Configure Project Settings**:
+   - **Project Name**: `imovies-web`
+   - **Framework Preset**: **Vite**
+   - **Root Directory**: Click *Edit* and select **`client`**
+4. **Build and Output Settings**:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+   - Install Command: `npm install`
+5. **Environment Variables**:
+   Add the following under **Production**, **Preview**, and **Development**:
+
+   | Variable Name | Value | Description |
+   |---|---|---|
+   | `VITE_API_BASE_URL` | `https://<your-backend-url>.vercel.app/api/v1` | URL of the deployed backend with `/api/v1` suffix |
+
+6. Click **Deploy**.
+7. Note your frontend production URL (e.g. `https://imovies-web-adirathi.vercel.app`).
+
+---
+
+### Step 5: Link Frontend URL in Backend CORS
+1. Return to your **`imovies-api`** project in the Vercel Dashboard.
+2. Go to **Settings** → **Environment Variables**.
+3. Edit `CLIENT_URL` and set its value to your actual frontend domain:
+   ```env
+   CLIENT_URL=https://imovies-web-adirathi.vercel.app
+   ```
+   *(If you have a custom domain, add it comma-separated, e.g. `https://imovies-web.vercel.app,https://mycustomdomain.com`).*
+4. Go to **Deployments** → click the three dots `...` on the latest deployment → click **Redeploy** to apply the updated environment variable.
+
+---
+
+### Step 6: Seed Initial Movies & Showtimes to MongoDB Atlas
+To populate your production Atlas database with the initial movies, cinemas, screens, and showtimes:
+```bash
+# Run from your local terminal with MONGODB_URI set to your Atlas cluster:
+MONGODB_URI="mongodb+srv://<user>:<password>@cluster.mongodb.net/imovies?retryWrites=true&w=majority" npm run seed
+```
+All 7 premiere films, 3 multiplexes, auditorium seats, and future showtimes will immediately appear on your live site!
+
+---
+
+### Step 7: Redeployment & Continuous Deployment
+Vercel automatically triggers new builds whenever you push to your GitHub `main` branch.
+- Any frontend code change under `client/` will trigger a rebuild of `imovies-web`.
+- Any backend code change under `server/` will trigger an instant serverless function update for `imovies-api`.
+- When updating environment variables, remember to trigger a **Redeploy** from the Vercel dashboard.
+
+---
+
+### 🛠️ Troubleshooting Common Deployment Errors
+
+| Issue | Cause | Solution |
+|---|---|---|
+| **CORS Origin Not Allowed** | `CLIENT_URL` in backend project does not match frontend domain | Check browser console. Ensure `CLIENT_URL` in `imovies-api` matches `https://<frontend>.vercel.app` exactly (no trailing slash). Redeploy backend after updating. |
+| **500 Server Error on API requests** | Missing or incorrect `MONGODB_URI` | Verify `MONGODB_URI` in `imovies-api` environment variables. Check Atlas Network Access has `0.0.0.0/0` allowed. |
+| **404 on Page Refresh (e.g. `/movie/dune-part-two`)** | Missing SPA rewrite rule | Handled automatically by `client/vercel.json` rewrites `/(.*)` → `/index.html`. |
+| **API returns 404** | Incorrect route path prefix | Ensure `VITE_API_BASE_URL` ends with `/api/v1` (e.g. `https://imovies-api.vercel.app/api/v1`). |
+| **Mixed Content Warning** | Frontend requested HTTP rather than HTTPS | Ensure all environment variables specify `https://` instead of `http://`. |
+| **504 Gateway Timeout on first call** | Cold start / Mongoose reconnect delay | Our cached connection in `server/src/config/db.js` reuses warm connections (`readyState === 1`) and sets `serverSelectionTimeoutMS: 8000` to prevent lambda timeouts. |
 
 ---
 
 ## 📄 License
 MIT © IMovies Team. Designed for high-reliability cinema ticket booking.
+

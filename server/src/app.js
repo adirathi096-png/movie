@@ -21,31 +21,53 @@ export const createApp = () => {
   // Security headers
   app.use(helmet());
 
-  // CORS configuration
-  const allowedOrigins = [
-    process.env.CLIENT_URL,
+  // Configure CORS with multi-origin and Vercel preview support
+  const configuredClientUrls = (process.env.CLIENT_URL || '')
+    .split(',')
+    .map((u) => u.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const localOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
-  ].filter(Boolean);
+    'http://127.0.0.1:3000',
+  ];
+
+  const allowedOrigins = [...new Set([...configuredClientUrls, ...localOrigins])];
 
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, postman, same origin)
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-          callback(null, true);
-        } else {
-          callback(new Error('Origin not allowed by CORS'));
+        // Allow requests with no origin (mobile apps, curl, serverless health probes, same origin)
+        if (!origin) {
+          return callback(null, true);
         }
+
+        // Exact match in allowed origins list
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        // Allow Vercel preview deployments (*.vercel.app)
+        if (origin.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+
+        // Non-production fallback
+        if (process.env.NODE_ENV !== 'production') {
+          return callback(null, true);
+        }
+
+        callback(new Error(`Origin '${origin}' not allowed by CORS`));
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     })
   );
 
-  // Request logging in development/test
+  // Request logging
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
   }
@@ -54,11 +76,15 @@ export const createApp = () => {
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-  // Apply general rate limiter to API routes
+  // General rate limiter
   app.use('/api', apiLimiter);
 
-  // Mount API v1 routes
+  // Health routes at multiple canonical paths for universal monitoring
   app.use('/api/v1/health', healthRoutes);
+  app.use('/api/health', healthRoutes);
+  app.use('/health', healthRoutes);
+
+  // Mount API v1 routes
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/movies', movieRoutes);
   app.use('/api/v1/cinemas', cinemaRoutes);
@@ -67,16 +93,31 @@ export const createApp = () => {
   app.use('/api/v1/bookings', bookingRoutes);
   app.use('/api/v1/admin', adminRoutes);
 
-  // Root welcome route
-  app.get('/', (req, res) => {
+  // Alias mounts under /v1 (in case a reverse proxy rewrite strips /api)
+  app.use('/v1/auth', authRoutes);
+  app.use('/v1/movies', movieRoutes);
+  app.use('/v1/cinemas', cinemaRoutes);
+  app.use('/v1/showtimes', showtimeRoutes);
+  app.use('/v1/reservations', reservationRoutes);
+  app.use('/v1/bookings', bookingRoutes);
+  app.use('/v1/admin', adminRoutes);
+
+  // Root welcome / health route
+  const rootHandler = (req, res) => {
     res.json({
       success: true,
-      message: 'Welcome to IMovies API. Visit /api/v1/health for service status.',
+      message: 'IMovies REST API is running.',
+      version: '1.0.0',
+      health: '/api/v1/health',
       docs: '/api/v1',
     });
-  });
+  };
 
-  // Catch-all 404 and global error handler
+  app.get('/', rootHandler);
+  app.get('/api', rootHandler);
+  app.get('/api/v1', rootHandler);
+
+  // 404 & centralized error handler
   app.use(notFound);
   app.use(errorHandler);
 
