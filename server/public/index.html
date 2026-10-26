@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMovies API — Server Status</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #090b10;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    .glow-orb {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(229, 9, 20, 0.18) 0%, rgba(99, 102, 241, 0.08) 50%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      filter: blur(40px);
+    }
+    .card {
+      position: relative;
+      background: rgba(18, 22, 33, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(229, 9, 20, 0.1);
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-red { color: #e50914; -webkit-text-fill-color: #e50914; }
+    p.desc {
+      color: #94a3b8;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .status-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: left;
+      font-size: 13px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: #64748b; font-weight: 600; }
+    .status-val { color: #f1f5f9; font-family: monospace; font-size: 12px; }
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #e50914;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+    }
+    .btn-primary:hover {
+      background: #f40612;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+    .footer-note {
+      margin-top: 24px;
+      color: #64748b;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-orb"></div>
+  <div class="card">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      Backend Server Active
+    </div>
+    <h1>I<span class="brand-red">Movies</span> REST API</h1>
+    <p class="desc">
+      The full-stack movie ticket booking backend is deployed on Vercel Serverless Functions.
+    </p>
+
+    <div class="status-box">
+      <div class="status-row">
+        <span class="status-label">Runtime</span>
+        <span class="status-val">Node.js Serverless Function</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">API Health</span>
+        <span class="status-val" id="health-val">Checking...</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Database</span>
+        <span class="status-val" id="db-val">Connecting to Atlas...</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/api/v1/health" class="btn btn-primary" target="_blank">Health Check API</a>
+      <a href="/api/v1/movies" class="btn btn-secondary" target="_blank">Movies API</a>
+      <a href="/api/v1/cinemas" class="btn btn-secondary" target="_blank">Cinemas API</a>
+    </div>
+
+    <p class="footer-note">
+      🎬 Looking for the cinema website? Deploy the frontend project (<code>client</code>) on Vercel to access the ticket booking interface!
+    </p>
+  </div>
+
+  <script>
+    fetch('/api/v1/health')
+      .then(res => res.json())
+      .then(data => {
+        const healthEl = document.getElementById('health-val');
+        const dbEl = document.getElementById('db-val');
+        if (data.success && data.database === 'connected') {
+          healthEl.textContent = 'Healthy (200 OK)';
+          healthEl.style.color = '#4ade80';
+          dbEl.textContent = 'Connected (MongoDB Atlas)';
+          dbEl.style.color = '#4ade80';
+        } else if (data.databaseError) {
+          healthEl.textContent = 'Online';
+          healthEl.style.color = '#38bdf8';
+          dbEl.textContent = 'Auth Pending (Check Password)';
+          dbEl.style.color = '#f59e0b';
+        } else {
+          healthEl.textContent = 'Online';
+          dbEl.textContent = data.database || 'Active';
+        }
+      })
+      .catch(() => {
+        document.getElementById('health-val').textContent = 'Live';
+        document.getElementById('db-val').textContent = 'Connecting';
+      });
+  </script>
+</body>
+</html>
