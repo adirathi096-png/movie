@@ -1,0 +1,31 @@
+{
+  "name": "imovies-platform",
+  "version": "1.0.0",
+  "description": "IMovies — Movie Ticket Booking Made Simple",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
+    "seed": "npm run seed --prefix server",
+    "test:server": "npm test --prefix server",
+    "test:client": "npm test --prefix client",
+    "test": "npm run test:server && npm run test:client",
+    "build:client": "npm run build --prefix client",
+    "start": "npm start --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "movie-booking",
+    "mern",
+    "react",
+    "express",
+    "mongodb",
+    "cinema-tickets"
+  ],
+  "author": "IMovies Team",
+  "license": "ISC"
+}
